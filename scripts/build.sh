@@ -113,8 +113,9 @@ if $WITH_GHIDRA; then
     (cd "$root/ghidra/support/gradle" && JAVA_HOME="$root/jdk" $gradle_cmd --no-daemon buildNatives)
     rm -rf "$root/ghidra/support/gradle/.gradle"
     # REA accepts both os/<platform> and build/os/<platform> decompiler locations.
-    ls "$root/ghidra/Ghidra/Features/Decompiler/os/$natives/decompile" \
-       "$root/ghidra/Ghidra/Features/Decompiler/build/os/$natives/decompile" 2>/dev/null | grep -q .
+    rm -rf "$root/ghidra/support/gradle/build"
+    test -x "$root/ghidra/Ghidra/Features/Decompiler/os/$natives/decompile" \
+      || test -x "$root/ghidra/Ghidra/Features/Decompiler/build/os/$natives/decompile"
   fi
 fi
 
