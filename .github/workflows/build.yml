@@ -101,8 +101,9 @@ jobs:
           (cd t/rea-offline-* && ./install.sh)
           "$HOME/.local/bin/rea" --version
           if [ -d "$HOME/.local/share/rea-offline/ghidra" ]; then
-            lipo /usr/bin/true -thin arm64 -output "$PWD/true-arm64"
-            "$HOME/.local/bin/rea" analyze "$PWD/true-arm64" > analyze.out 2>&1 || { cat analyze.out; exit 1; }
+            printf 'int main(void){return 0;}\n' > hello.c
+            cc -arch arm64 -o "$PWD/hello-arm64" hello.c
+            "$HOME/.local/bin/rea" analyze "$PWD/hello-arm64" > analyze.out 2>&1 || { cat analyze.out; exit 1; }
             head -60 analyze.out
           fi
 
