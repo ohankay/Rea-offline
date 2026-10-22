@@ -1,0 +1,115 @@
+name: Build offline bundles
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      rea_version:
+        description: "rea-agents version to package"
+        default: "6.7.0"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  REA_VERSION: ${{ github.event.inputs.rea_version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '6.7.0' }}
+
+jobs:
+  build:
+    name: ${{ matrix.target }}${{ matrix.ghidra && ' (ghidra)' || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: linux-x64, runner: ubuntu-24.04, ghidra: false }
+          - { target: linux-x64, runner: ubuntu-24.04, ghidra: true }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, ghidra: false }
+          - { target: linux-arm64, runner: ubuntu-24.04-arm, ghidra: true }
+          - { target: win-x64, runner: windows-2022, ghidra: false }
+          - { target: win-x64, runner: windows-2022, ghidra: true }
+          - { target: darwin-arm64, runner: macos-15, ghidra: false }
+          - { target: darwin-arm64, runner: macos-15, ghidra: true }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build bundle
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${REA_VERSION#v}"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          scripts/build.sh --rea-version "$version" ${{ matrix.ghidra && '--with-ghidra' || '' }} --out dist
+
+      - name: Test install with networking disabled (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir t && tar -xzf dist/*.tar.gz -C t
+          cat > offline-test.sh <<'EOF'
+          set -eux
+          export HOME=$(mktemp -d)
+          cd t/rea-offline-*
+          if curl -sS -m 5 https://registry.npmjs.org >/dev/null 2>&1; then echo 'network is still up'; exit 1; fi
+          ./install.sh
+          "$HOME/.local/bin/rea" --version
+          "$HOME/.local/bin/rea" doctor || true
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 60 "$HOME/.local/bin/rea" mcp | grep -q '"serverInfo"'
+          if [ -d ghidra ]; then
+            timeout 900 "$HOME/.local/bin/rea" analyze /bin/true | head -40
+          fi
+          EOF
+          sudo unshare --net bash offline-test.sh
+
+      - name: Test install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist/*.zip | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath t
+          $dir = Get-ChildItem t -Directory | Select-Object -First 1
+          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir.FullName 'install.ps1')
+          & "$env:LOCALAPPDATA\rea-offline\bin\rea.cmd" --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Test install (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir t && tar -xzf dist/*.tar.gz -C t
+          export HOME=$(mktemp -d)
+          (cd t/rea-offline-* && ./install.sh)
+          "$HOME/.local/bin/rea" --version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundle-${{ matrix.target }}${{ matrix.ghidra && '-ghidra' || '' }}
+          path: dist/*
+          compression-level: 0
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${REA_VERSION#v}"
+          tag="v$version"
+          ls -lh dist
+          notes="Offline (internetsiz) REA $version paketleri. Indirip hedef makinede install.sh / install.cmd calistirin. Ayrintilar icin README."
+          gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$tag" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "REA $version offline" --notes "$notes"
+          gh release upload "$tag" dist/* -R "$GITHUB_REPOSITORY" --clobber

@@ -1,0 +1,39 @@
+REA - Internetsiz (offline) kurulum paketi
+==========================================
+
+Bu klasor REA'yi calistirmak icin gereken her seyi icerir: Node.js,
+REA (rea-agents) ve tum bagimliliklari. "-ghidra" paketlerinde ayrica
+Ghidra ve Java (JDK) da vardir. Kurulum ve calisma sirasinda internet GEREKMEZ.
+
+LINUX / macOS
+  tar -xzf rea-offline-*.tar.gz
+  cd rea-offline-*
+  ./install.sh
+  rea --help
+
+  Kurmadan dogrudan calistirmak icin:  ./bin/rea --help
+  Sistem geneli kurulum:  sudo PREFIX=/opt/rea-offline BIN_DIR=/usr/local/bin ./install.sh
+  Kaldirma:  ./uninstall.sh
+
+WINDOWS
+  Zip'i acin, klasordeki install.cmd dosyasina cift tiklayin.
+  Yeni bir terminal acip:  rea --help
+  Kurmadan calistirmak icin:  bin\rea.cmd --help
+  Kaldirma:  powershell -ExecutionPolicy Bypass -File uninstall.ps1
+
+KULLANIM
+  rea doctor              hangi analiz araclarinin hazir oldugunu gosterir
+  rea analyze <dosya>     ikili dosya analizi (Ghidra/IDA/Hopper gerektirir;
+                          "-ghidra" paketinde Ghidra hazir gelir)
+  rea mcp                 MCP sunucusunu baslatir (Claude Code, Codex vb. icin)
+
+  MCP istemcisine eklemek icin komut olarak kurulu "rea" yolunu ve
+  arguman olarak "mcp" verin, ornek (Claude Code):
+    claude mcp add rea -- rea mcp
+
+Not: Ghidra'siz pakette ikili (binary) analizi icin kendi Ghidra 12.1.x
+kurulumunuzu GHIDRA_INSTALL_DIR ortam degiskeni ile gosterebilirsiniz.
+JavaScript/Electron, web paketi, WASM vb. analizler ek arac gerektirmez.
+
+English: run ./install.sh (Linux/macOS) or install.cmd (Windows). No network
+access is needed at install time or run time.
