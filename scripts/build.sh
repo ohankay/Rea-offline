@@ -97,6 +97,25 @@ if $WITH_GHIDRA; then
   jdk_dir="$(ls -d "$work"/jdk-x/*/ | head -1)"
   if [[ $os == darwin ]]; then jdk_dir="$jdk_dir/Contents/Home"; fi
   mv "$jdk_dir" "$root/jdk"
+
+  # Official Ghidra zips lack native binaries for some hosts (e.g. linux_arm_64);
+  # build them with Ghidra's own Gradle wrapper so the decompiler is present.
+  case "$os-$arch" in
+    linux-x64) natives=linux_x86_64 ;; linux-arm64) natives=linux_arm_64 ;;
+    darwin-x64) natives=mac_x86_64 ;; darwin-arm64) natives=mac_arm_64 ;;
+    win-x64) natives=win_x86_64 ;;
+  esac
+  if [[ ! -e "$root/ghidra/Ghidra/Features/Decompiler/os/$natives/decompile" \
+     && ! -e "$root/ghidra/Ghidra/Features/Decompiler/os/$natives/decompile.exe" ]]; then
+    echo "==> building Ghidra natives for $natives"
+    gradle_cmd=gradle
+    [[ -x "$root/ghidra/support/gradle/gradlew" ]] && gradle_cmd=./gradlew
+    (cd "$root/ghidra/support/gradle" && JAVA_HOME="$root/jdk" $gradle_cmd --no-daemon buildNatives)
+    rm -rf "$root/ghidra/support/gradle/.gradle"
+    # REA accepts both os/<platform> and build/os/<platform> decompiler locations.
+    ls "$root/ghidra/Ghidra/Features/Decompiler/os/$natives/decompile" \
+       "$root/ghidra/Ghidra/Features/Decompiler/build/os/$natives/decompile" 2>/dev/null | grep -q .
+  fi
 fi
 
 # 4) Launchers, installers and docs.

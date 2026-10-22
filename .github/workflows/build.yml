@@ -42,6 +42,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - uses: gradle/actions/setup-gradle@v4
+        if: matrix.ghidra
+        with:
+          gradle-version: "8.14.3"
       - name: Build bundle
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
