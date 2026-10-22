@@ -8,11 +8,15 @@ while [ -L "$self" ]; do
 done
 ROOT=$(cd "$(dirname "$self")/.." && pwd)
 PATH="$ROOT/node/bin:$PATH"
-if [ -d "$ROOT/ghidra" ] && [ -z "${GHIDRA_INSTALL_DIR:-}" ]; then
-  GHIDRA_INSTALL_DIR="$ROOT/ghidra"; export GHIDRA_INSTALL_DIR
-fi
-if [ -d "$ROOT/jdk" ] && [ -z "${JAVA_HOME:-}" ]; then
-  JAVA_HOME="$ROOT/jdk"; PATH="$JAVA_HOME/bin:$PATH"; export JAVA_HOME
+# The bundled Ghidra/JDK always win over whatever the host has configured, so a
+# stale JAVA_HOME cannot break analysis. Set REA_USE_SYSTEM_TOOLS=1 to opt out.
+if [ -z "${REA_USE_SYSTEM_TOOLS:-}" ]; then
+  if [ -d "$ROOT/ghidra" ]; then
+    GHIDRA_INSTALL_DIR="$ROOT/ghidra"; export GHIDRA_INSTALL_DIR
+  fi
+  if [ -d "$ROOT/jdk" ]; then
+    JAVA_HOME="$ROOT/jdk"; PATH="$JAVA_HOME/bin:$PATH"; export JAVA_HOME
+  fi
 fi
 export PATH
 NO_UPDATE_NOTIFIER=1; export NO_UPDATE_NOTIFIER

@@ -31,6 +31,10 @@ KULLANIM
   arguman olarak "mcp" verin, ornek (Claude Code):
     claude mcp add rea -- rea mcp
 
+Not: "-ghidra" paketi her zaman kendi Ghidra ve JDK'sini kullanir (sistemdeki
+JAVA_HOME yok sayilir). Kendi araclarinizi kullanmak icin REA_USE_SYSTEM_TOOLS=1
+ayarlayin.
+
 Not: Ghidra'siz pakette ikili (binary) analizi icin kendi Ghidra 12.1.x
 kurulumunuzu GHIDRA_INSTALL_DIR ortam degiskeni ile gosterebilirsiniz.
 JavaScript/Electron, web paketi, WASM vb. analizler ek arac gerektirmez.

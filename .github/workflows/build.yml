@@ -55,7 +55,7 @@ jobs:
         run: |
           mkdir t && tar -xzf dist/*.tar.gz -C t
           cat > offline-test.sh <<'EOF'
-          set -eux
+          set -euxo pipefail
           export HOME=$(mktemp -d)
           cd t/rea-offline-*
           if curl -sS -m 5 https://registry.npmjs.org >/dev/null 2>&1; then echo 'network is still up'; exit 1; fi
@@ -65,7 +65,8 @@ jobs:
           printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
             | timeout 60 "$HOME/.local/bin/rea" mcp | grep -q '"serverInfo"'
           if [ -d ghidra ]; then
-            timeout 900 "$HOME/.local/bin/rea" analyze /bin/true | head -40
+            timeout 900 "$HOME/.local/bin/rea" analyze /bin/true > analyze.out 2>&1 || { cat analyze.out; exit 1; }
+            head -60 analyze.out
           fi
           EOF
           sudo unshare --net bash offline-test.sh
@@ -78,8 +79,15 @@ jobs:
           Expand-Archive $zip.FullName -DestinationPath t
           $dir = Get-ChildItem t -Directory | Select-Object -First 1
           & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $dir.FullName 'install.ps1')
-          & "$env:LOCALAPPDATA\rea-offline\bin\rea.cmd" --version
+          $rea = "$env:LOCALAPPDATA\rea-offline\bin\rea.cmd"
+          & $rea --version
           if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (Test-Path "$env:LOCALAPPDATA\rea-offline\ghidra") {
+            & $rea analyze C:\Windows\System32\whoami.exe *> analyze.out
+            $code = $LASTEXITCODE
+            Get-Content analyze.out -TotalCount 60
+            if ($code -ne 0) { exit 1 }
+          }
 
       - name: Test install (macOS)
         if: runner.os == 'macOS'
@@ -88,6 +96,10 @@ jobs:
           export HOME=$(mktemp -d)
           (cd t/rea-offline-* && ./install.sh)
           "$HOME/.local/bin/rea" --version
+          if [ -d "$HOME/.local/share/rea-offline/ghidra" ]; then
+            "$HOME/.local/bin/rea" analyze /usr/bin/true > analyze.out 2>&1 || { cat analyze.out; exit 1; }
+            head -60 analyze.out
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
